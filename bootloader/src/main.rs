@@ -21,6 +21,7 @@ use uefi::{
     table::boot::PAGE_SIZE,
     CStr16,
 };
+use util::{Display, DisplayInfo};
 
 #[entry]
 fn main(_image_handle: Handle, system_table: SystemTable<Boot>) -> Status {
@@ -35,6 +36,7 @@ fn main(_image_handle: Handle, system_table: SystemTable<Boot>) -> Status {
     println!("UEFI Version: {}.{}", uefi_rev.major(), uefi_rev.minor());
     println!("Firmware Vendor: {}", firmware_vendor);
 
+    // Load kernel
     let buf = open_file(
         boot_services,
         cstr16!("\\kernel.elf"),
@@ -47,15 +49,16 @@ fn main(_image_handle: Handle, system_table: SystemTable<Boot>) -> Status {
     let _ = load_elf(boot_services, &buf, &elf);
     println!("Loaded kernel");
 
-    let (fb_ptr, fb_size) = get_frame_buffer_ptr(boot_services).unwrap();
+    // Get frame buffer
+    let display = get_display_handle(boot_services).unwrap();
 
     // Exit boot service
     let (_system_table, _memory_map) =
         unsafe { system_table.exit_boot_services(MemoryType::LOADER_DATA) };
 
     // Execute Kernel
-    let entry_point: extern "sysv64" fn(*mut u8, usize) = unsafe { mem::transmute(elf.entry) };
-    entry_point(fb_ptr, fb_size);
+    let entry_point: extern "sysv64" fn(Display) = unsafe { mem::transmute(elf.entry) };
+    entry_point(display);
 
     loop {}
 
@@ -100,14 +103,23 @@ fn copy_load_segments(buff: &[u8], elf: &Elf) {
     }
 }
 
-fn get_frame_buffer_ptr(boot_services: &BootServices) -> Result<(*mut u8, usize), uefi::Error> {
+fn get_display_handle(boot_services: &BootServices) -> Result<Display, uefi::Error> {
     let handle = boot_services.get_handle_for_protocol::<GraphicsOutput>()?;
     let mut gop = boot_services.open_protocol_exclusive::<GraphicsOutput>(handle)?;
+    let mode = gop.current_mode_info();
+    let resolution = mode.resolution();
     let mut fb = gop.frame_buffer();
-    let fb_ptr = fb.as_mut_ptr();
-    let fb_size = fb.size();
+    let ptr = fb.as_mut_ptr();
+    let size = fb.size();
 
-    Ok((fb_ptr, fb_size))
+    let info = DisplayInfo {
+        width: resolution.0,
+        height: resolution.1,
+        stride: mode.stride(),
+        format: mode.pixel_format(),
+    };
+
+    Ok(Display::new(ptr, size, info))
 }
 
 fn open_file(

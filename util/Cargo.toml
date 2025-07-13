@@ -1,9 +1,7 @@
 [package]
-name = "kernel"
+name = "util"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 
 [dependencies]
-micromath = "2.1.0"
 uefi = { version = "0.31.0", features = [] }
-util = { path = "../util" }

@@ -6,3 +6,4 @@ edition = "2021"
 [dependencies]
 goblin = { version = "0.8.2", features = ["elf64", "elf32", "endian_fd"], default-features = false }
 uefi = { version = "0.31.0", features = ["panic_handler", "global_allocator", "alloc"] }
+util = { path = "../util" }
