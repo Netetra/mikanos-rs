@@ -2,7 +2,7 @@
 set -euC
 
 function build() {
-  cd $1 && cargo build
+  cd $1 && cargo build -Z json-target-spec
   cd ..
 }
 
